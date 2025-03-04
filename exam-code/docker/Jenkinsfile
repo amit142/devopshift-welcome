@@ -20,13 +20,28 @@ pipeline {
             }
         }
 
-        stage('Lint & Security Scan') {
-            steps {
-                sh 'apt install python3-pip flake8 bandit'
-                sh 'flake8 .'
-                sh 'bandit -r .'
+      stage('Lint & Security Scan') {
+            parallel {
+                stage('Flake8 Linting') {
+                    steps {
+                        script {
+                            sh 'pip install flake8'  // Install flake8 if not already installed
+                            sh 'flake8 .'  // Run flake8 linting on the project
+                        }
+                    }
+                }
+
+                stage('Bandit Security Scan') {
+                    steps {
+                        script {
+                            sh 'pip install bandit'  // Install bandit if not already installed
+                            sh 'bandit -r .'  // Run bandit security scan on the project
+                        }
+                    }
+                }
             }
         }
+
 
         stage('Install Dependencies') {
             steps {
