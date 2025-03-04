@@ -58,7 +58,7 @@ pipeline {
 
         stage('Install Dependencies') {
             steps {
-                sh 'pip install -r requirements.txt'
+                sh 'pip install -r ${params.REPO_NAME}/requirements.txt'
             }
         }
 
