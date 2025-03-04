@@ -4,11 +4,14 @@ pipeline {
             image 'python:3.10'
         }
     }
+    parameters {
+        choice(name: 'REPO_NAME', choices: ['fe', 'be'], description: 'Select the repository to build')
+    }
     environment {
         DOCKERHUB_CREDENTIALS = credentials('docker-hub-creds')
         DOCKER_REGISTRY = 'amit142'
-        REPO_NAME = (env.BRANCH_NAME == 'fe') ? 'fe' : 'be'
         IMAGE_TAG = "${env.BUILD_NUMBER}"
+        DOCKERFILE_PATH = "exam-code/docker/${params.REPO_NAME}"  // Define the Dockerfile path based on the selected repo
     }
     stages {
         stage('Clone Repository') {
@@ -16,7 +19,7 @@ pipeline {
                 git branch: 'workshop/argo-jenkins-exam', url: 'https://github.com/amit142/devopshift-welcome.git'
             }
         }
-        
+
         stage('Lint & Security Scan') {
             steps {
                 sh 'pip install flake8 bandit'
@@ -24,40 +27,51 @@ pipeline {
                 sh 'bandit -r .'
             }
         }
-        
+
         stage('Install Dependencies') {
             steps {
                 sh 'pip install -r requirements.txt'
             }
         }
-        
+
         stage('Build Docker Image') {
             steps {
-                sh "docker build -t $DOCKER_REGISTRY/$REPO_NAME:$IMAGE_TAG ."
-                sh "docker tag $DOCKER_REGISTRY/$REPO_NAME:$IMAGE_TAG $DOCKER_REGISTRY/$REPO_NAME:latest"
+                script {
+                    // Build the Docker image based on the selected repo (frontend or backend)
+                    sh "docker build -t $DOCKER_REGISTRY/$params.REPO_NAME:$IMAGE_TAG -f $DOCKERFILE_PATH/Dockerfile ."
+                    sh "docker tag $DOCKER_REGISTRY/$params.REPO_NAME:$IMAGE_TAG $DOCKER_REGISTRY/$params.REPO_NAME:latest"
+                }
             }
         }
-        
+
         stage('Run Tests in Container') {
             steps {
-                sh "docker run --rm $DOCKER_REGISTRY/$REPO_NAME:$IMAGE_TAG pytest tests/"
+                script {
+                    // Running the tests within the Docker container
+                    sh "docker run --rm $DOCKER_REGISTRY/$params.REPO_NAME:$IMAGE_TAG pytest tests/"
+                }
             }
         }
-        
+
         stage('Integration Test with Docker Compose') {
             steps {
-                sh 'docker-compose up -d'
-                sleep time: 10, unit: 'SECONDS'  // Wait for services to start
-                sh 'curl -f http://localhost:5002 || exit 1'  // Adjust port for backend if needed
-                sh 'docker-compose down'
+                script {
+                    sh 'docker-compose -f $DOCKERFILE_PATH/docker-compose.yml up -d'
+                    sleep time: 10, unit: 'SECONDS'  // Wait for services to start
+                    sh 'curl -f http://localhost:5002 || exit 1'  // Adjust port for backend if needed
+                    sh 'docker-compose down'
+                }
             }
         }
-        
+
         stage('Push to Docker Hub') {
             steps {
-                sh "echo $DOCKERHUB_CREDENTIALS_PSW | docker login -u $DOCKERHUB_CREDENTIALS_USR --password-stdin"
-                sh "docker push $DOCKER_REGISTRY/$REPO_NAME:$IMAGE_TAG"
-                sh "docker push $DOCKER_REGISTRY/$REPO_NAME:latest"
+                script {
+                    // Login and push to Docker Hub
+                    sh "echo $DOCKERHUB_CREDENTIALS_PSW | docker login -u $DOCKERHUB_CREDENTIALS_USR --password-stdin"
+                    sh "docker push $DOCKER_REGISTRY/$params.REPO_NAME:$IMAGE_TAG"
+                    sh "docker push $DOCKER_REGISTRY/$params.REPO_NAME:latest"
+                }
             }
         }
     }
