@@ -8,7 +8,8 @@ import requests
 app = Flask(__name__)
 
 # Backend API URL
-BACKEND_API_URL = "http://backend-service:5005/fetch_price"
+BACKEND_API_URL = "http://backend-service:5001/fetch_price"
+
 
 @app.route("/api/status")
 def status():
@@ -36,3 +37,4 @@ def fetch_price():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5002, debug=False)
+
