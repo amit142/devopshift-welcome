@@ -18,6 +18,26 @@ pipeline {
             }
         }
 
+        stage('Setup Environment') {
+            steps {
+                script {
+                    // Install Docker Compose if not already installed
+                    sh '''
+                    if ! command -v docker-compose &> /dev/null; then
+                        echo "Installing Docker Compose..."
+                        DOCKER_COMPOSE_VERSION=$(curl -s https://api.github.com/repos/docker/compose/releases/latest | grep 'tag_name' | cut -d\" -f4)
+                        sudo curl -L "https://github.com/docker/compose/releases/download/${DOCKER_COMPOSE_VERSION}/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+                        sudo chmod +x /usr/local/bin/docker-compose
+                        docker-compose --version
+                    else
+                        echo "Docker Compose is already installed"
+                        docker-compose --version
+                    fi
+                    '''
+                }
+            }
+        }
+
         stage('Lint & Security Scan') {
             parallel {
                 stage('Flake8 Linting') {
@@ -90,13 +110,22 @@ EOF
             }
         }
 
-        stage('Integration Test with Docker Compose') {
+        stage('Integration Test') {
             steps {
                 script {
-                    sh 'docker-compose -f $DOCKERFILE_PATH/docker-compose.yml up -d'
-                    sleep time: 10, unit: 'SECONDS'
-                    sh 'curl -f http://localhost:5002 || echo "Integration test failed but continuing"'
-                    sh 'docker-compose down'
+                    // Alternative to docker-compose - run container directly
+                    sh '''
+                    echo "Starting container for integration test..."
+                    docker run -d --name fe_test -p 5002:5002 $DOCKER_REGISTRY/fe:$IMAGE_TAG
+                    sleep 10  # Wait for container to start
+                    
+                    # Run integration test
+                    curl -f http://localhost:5002 || echo "Integration test failed but continuing"
+                    
+                    # Clean up
+                    docker stop fe_test
+                    docker rm fe_test
+                    '''
                 }
             }
         }
