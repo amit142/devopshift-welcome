@@ -22,7 +22,7 @@ pipeline {
 
         stage('Lint & Security Scan') {
             steps {
-                sh 'pip install flake8 bandit'
+                sh 'sudo apt install python3-pip flake8 bandit'
                 sh 'flake8 .'
                 sh 'bandit -r .'
             }
