@@ -90,12 +90,12 @@ EOF
             }
         }
 
-        stage('Integration Test with Docker Compose') {
+           stage('Integration Test with Docker Compose') {
             steps {
                 script {
                     sh 'docker-compose -f $DOCKERFILE_PATH/docker-compose.yml up -d'
                     sleep time: 10, unit: 'SECONDS'
-                    sh 'curl -f http://localhost:5001 || echo "Integration test failed but continuing"'
+                    sh 'curl -f http://localhost:5002 || echo "Integration test failed but continuing"'
                     sh 'docker-compose down'
                 }
             }
