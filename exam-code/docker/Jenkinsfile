@@ -7,7 +7,7 @@ pipeline {
     environment {
         DOCKERHUB_CREDENTIALS = credentials('docker-hub-creds')
         DOCKER_REGISTRY = 'amit142'
-        REPO_NAME = (env.BRANCH_NAME == 'frontend') ? 'fe-exam' : 'be-exam'
+        REPO_NAME = (env.BRANCH_NAME == 'fe') ? 'fe' : 'be'
         IMAGE_TAG = "${env.BUILD_NUMBER}"
     }
     stages {
