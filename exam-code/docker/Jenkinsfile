@@ -57,10 +57,17 @@ pipeline {
 
 
         stage('Install Dependencies') {
-            steps {
-                sh 'pip install -r ${params.REPO_NAME}/requirements.txt'
-            }
+    steps {
+        script {
+            // Determine the path of the requirements.txt based on the user's choice
+            def requirementsFile = "exam-code/docker/${params.REPO_NAME}/requirements.txt"
+            
+            // Install dependencies from the correct requirements.txt file
+            sh "pip install -r ${requirementsFile}"
         }
+    }
+}
+
 
         stage('Build Docker Image') {
             steps {
