@@ -8,7 +8,9 @@ import requests
 app = Flask(__name__)
 
 # Backend API URL
-BACKEND_API_URL = "http://backend-service:5001/fetch_price"
+BACKEND_API_URL = (
+    "http://backend-service:5001/fetch_price"
+)
 
 
 @app.route("/api/status")
