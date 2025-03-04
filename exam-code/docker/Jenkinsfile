@@ -8,7 +8,7 @@ pipeline {
         choice(name: 'REPO_NAME', choices: ['fe', 'be'], description: 'Select the repository to build')
     }
     environment {
-        DOCKERHUB_CREDENTIALS = credentials('docker-hub-creds')
+        DOCKERHUB_CREDENTIALS = credentials('1')
         DOCKER_REGISTRY = 'amit142'
         IMAGE_TAG = "${env.BUILD_NUMBER}"
         DOCKERFILE_PATH = "exam-code/docker/${params.REPO_NAME}"  // Define the Dockerfile path based on the selected repo
