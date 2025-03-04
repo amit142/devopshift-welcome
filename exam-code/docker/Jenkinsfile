@@ -92,15 +92,17 @@ pipeline {
         stage('Integration Test with Docker Compose') {
             steps {
                 script {
-                    // Start services with Docker Compose
-                    //sh 'docker-compose -f $DOCKERFILE_PATH/docker-compose.yml up -d'
-                    //sleep time: 10, unit: 'SECONDS'  // Allow services to initialize
-                    //sh 'curl -f http://localhost:5002 || exit 1'  // Adjust for backend if needed
-                    //sh 'docker-compose down'  // Tear down services
+                    // Mocked integration test - skipping actual Docker Compose commands for now
                     echo "integration test"
+                    // Uncomment the following lines once ready to run actual integration tests
+                    // sh 'docker-compose -f $DOCKERFILE_PATH/docker-compose.yml up -d'
+                    // sleep time: 10, unit: 'SECONDS'  // Allow services to initialize
+                    // sh 'curl -f http://localhost:5002 || exit 1'  // Adjust for backend if needed
+                    // sh 'docker-compose down'  // Tear down services
                 }
             }
         }
+
 
         stage('Push to Docker Hub') {
             steps {
