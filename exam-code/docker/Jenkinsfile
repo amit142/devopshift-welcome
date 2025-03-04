@@ -2,72 +2,76 @@ pipeline {
     agent {
         docker {
             image 'python:3.10'
+            args '--privileged -v /var/run/docker.sock:/var/run/docker.sock'  // Mount Docker socket for Docker-in-Docker
         }
     }
+
     parameters {
         choice(name: 'REPO_NAME', choices: ['fe', 'be'], description: 'Select the repository to build')
     }
+
     environment {
         DOCKERHUB_CREDENTIALS = credentials('1')
         DOCKER_REGISTRY = 'amit142'
         IMAGE_TAG = "${env.BUILD_NUMBER}"
         DOCKERFILE_PATH = "exam-code/docker/${params.REPO_NAME}"  // Define the Dockerfile path based on the selected repo
     }
+
     stages {
         stage('Clone Repository') {
             steps {
-                git branch: 'workshop/argo-jenkins-exam', url: 'https://github.com/amit142/devopshift-welcome.git'
-            }
-        }
-
-    stage('Lint & Security Scan') {
-    parallel {
-        stage('Flake8 Linting') {
-            steps {
                 script {
-                    // Install flake8 if not already installed, and continue regardless of the result
-                    sh 'pip install flake8' 
-                    def lintResult = sh(script: 'flake8 .', returnStatus: true) // Run flake8 linting on the project
-                    if (lintResult != 0) {
-                        echo "Flake8 linting failed with exit code: ${lintResult}"
-                    } else {
-                        echo "Flake8 linting passed"
-                    }
+                    // Clone the repository based on the selected repo parameter
+                    git branch: 'workshop/argo-jenkins-exam', url: 'https://github.com/amit142/devopshift-welcome.git'
                 }
             }
         }
 
-        stage('Bandit Security Scan') {
-            steps {
-                script {
-                    // Install bandit if not already installed, and continue regardless of the result
-                    sh 'pip install bandit'
-                    def banditResult = sh(script: 'bandit -r .', returnStatus: true) // Run bandit security scan on the project
-                    if (banditResult != 0) {
-                        echo "Bandit security scan failed with exit code: ${banditResult}"
-                    } else {
-                        echo "Bandit security scan passed"
+        stage('Lint & Security Scan') {
+            parallel {
+                stage('Flake8 Linting') {
+                    steps {
+                        script {
+                            // Install flake8 if not already installed and run linting
+                            sh 'pip install flake8'
+                            def lintResult = sh(script: 'flake8 .', returnStatus: true)  // Run flake8 linting on the project
+                            if (lintResult != 0) {
+                                echo "Flake8 linting failed with exit code: ${lintResult}"
+                            } else {
+                                echo "Flake8 linting passed"
+                            }
+                        }
+                    }
+                }
+
+                stage('Bandit Security Scan') {
+                    steps {
+                        script {
+                            // Install bandit if not already installed and run the security scan
+                            sh 'pip install bandit'
+                            def banditResult = sh(script: 'bandit -r .', returnStatus: true)  // Run bandit security scan on the project
+                            if (banditResult != 0) {
+                                echo "Bandit security scan failed with exit code: ${banditResult}"
+                            } else {
+                                echo "Bandit security scan passed"
+                            }
+                        }
                     }
                 }
             }
         }
-    }
-}
-
-
 
         stage('Install Dependencies') {
-    steps {
-        script {
-            // Determine the path of the requirements.txt based on the user's choice
-            def requirementsFile = "exam-code/docker/${params.REPO_NAME}/requirements.txt"
-            
-            // Install dependencies from the correct requirements.txt file
-            sh "pip install -r ${requirementsFile}"
+            steps {
+                script {
+                    // Determine the path of the requirements.txt based on the user's choice (frontend or backend)
+                    def requirementsFile = "exam-code/docker/${params.REPO_NAME}/requirements.txt"
+                    
+                    // Install dependencies from the correct requirements.txt file
+                    sh "pip install -r ${requirementsFile}"
+                }
+            }
         }
-    }
-}
-
 
         stage('Build Docker Image') {
             steps {
@@ -82,7 +86,7 @@ pipeline {
         stage('Run Tests in Container') {
             steps {
                 script {
-                    // Running the tests within the Docker container
+                    // Run tests inside the container
                     sh "docker run --rm $DOCKER_REGISTRY/$params.REPO_NAME:$IMAGE_TAG pytest tests/"
                 }
             }
@@ -91,10 +95,11 @@ pipeline {
         stage('Integration Test with Docker Compose') {
             steps {
                 script {
+                    // Start services with Docker Compose
                     sh 'docker-compose -f $DOCKERFILE_PATH/docker-compose.yml up -d'
-                    sleep time: 10, unit: 'SECONDS'  // Wait for services to start
-                    sh 'curl -f http://localhost:5002 || exit 1'  // Adjust port for backend if needed
-                    sh 'docker-compose down'
+                    sleep time: 10, unit: 'SECONDS'  // Allow services to initialize
+                    sh 'curl -f http://localhost:5002 || exit 1'  // Adjust for backend if needed
+                    sh 'docker-compose down'  // Tear down services
                 }
             }
         }
@@ -102,7 +107,7 @@ pipeline {
         stage('Push to Docker Hub') {
             steps {
                 script {
-                    // Login and push to Docker Hub
+                    // Login to Docker Hub and push the images
                     sh "echo $DOCKERHUB_CREDENTIALS_PSW | docker login -u $DOCKERHUB_CREDENTIALS_USR --password-stdin"
                     sh "docker push $DOCKER_REGISTRY/$params.REPO_NAME:$IMAGE_TAG"
                     sh "docker push $DOCKER_REGISTRY/$params.REPO_NAME:latest"
