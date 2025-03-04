@@ -1,18 +1,101 @@
 pipeline {
-    agent {
-        docker {
-            image 'python:3.10'
-        }
-    }
+    agent any
+    
     environment {
-        DOCKERHUB_CREDENTIALS = credentials('docker-hub-creds')
-        DOCKER_REGISTRY = 'yanivomc'
-        REPO_NAME = 'fe-exam'  // Change to 'be-exam' for backend pipeline
+        DOCKERHUB_CREDENTIALS = credentials('1')
+        DOCKER_REGISTRY = 'amit142'
         IMAGE_TAG = "${env.BUILD_NUMBER}"
-        
+        REPO_NAME = 'fe'
+        DOCKERFILE_PATH = "exam-code/docker/fe"
     }
+
     stages {
-        
-        
-        
+        stage('Clone Repository') {
+            steps {
+                script {
+                    git branch: 'workshop/argo-jenkins-exam', url: 'https://github.com/amit142/devopshift-welcome.git'
+                }
+            }
         }
+
+        stage('Lint & Security Scan') {
+            parallel {
+                stage('Flake8 Linting') {
+                    steps {
+                        script {
+                            sh 'pip install flake8'
+                            def lintResult = sh(script: 'flake8 .', returnStatus: true)
+                            if (lintResult != 0) {
+                                echo "Flake8 linting failed with exit code: ${lintResult}"
+                            } else {
+                                echo "Flake8 linting passed"
+                            }
+                        }
+                    }
+                }
+
+                stage('Bandit Security Scan') {
+                    steps {
+                        script {
+                            sh 'pip install bandit'
+                            def banditResult = sh(script: 'bandit -r .', returnStatus: true)
+                            if (banditResult != 0) {
+                                echo "Bandit security scan failed with exit code: ${banditResult}"
+                            } else {
+                                echo "Bandit security scan passed"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Install Dependencies') {
+            steps {
+                script {
+                    def requirementsFile = "exam-code/docker/fe/requirements.txt"
+                    sh "pip install -r ${requirementsFile}"
+                }
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    sh "docker build -t $DOCKER_REGISTRY/fe:$IMAGE_TAG -f $DOCKERFILE_PATH/Dockerfile ."
+                    sh "docker tag $DOCKER_REGISTRY/fe:$IMAGE_TAG $DOCKER_REGISTRY/fe:latest"
+                }
+            }
+        }
+
+        stage('Run Tests in Container') {
+            steps {
+                script {
+                    sh "docker run --rm $DOCKER_REGISTRY/fe:$IMAGE_TAG pytest tests/"
+                }
+            }
+        }
+
+        stage('Integration Test with Docker Compose') {
+            steps {
+                script {
+                    sh 'docker-compose -f $DOCKERFILE_PATH/docker-compose.yml up -d'
+                    sleep time: 10, unit: 'SECONDS'
+                    // Frontend endpoint check - assuming it runs on port 5001
+                    sh 'curl -f http://localhost:5001 || exit 1'
+                    sh 'docker-compose down'
+                }
+            }
+        }
+
+        stage('Push to Docker Hub') {
+            steps {
+                script {
+                    sh "echo $DOCKERHUB_CREDENTIALS_PSW | docker login -u $DOCKERHUB_CREDENTIALS_USR --password-stdin"
+                    sh "docker push $DOCKER_REGISTRY/fe:$IMAGE_TAG"
+                    sh "docker push $DOCKER_REGISTRY/fe:latest"
+                }
+            }
+        }
+    }
+}
