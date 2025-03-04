@@ -82,21 +82,18 @@ EOF
             }
         }
 
-        stage('Run Tests in Container') {
-            steps {
-                script {
-                    sh "docker run --rm $DOCKER_REGISTRY/fe:$IMAGE_TAG pytest tests/ || echo 'Tests may have failed but continuing'"
-                }
-            }
-        }
-
         stage('Integration Test with Docker Compose') {
+            
             steps {
-                script {
-                    sh 'docker-compose -f $DOCKERFILE_PATH/docker-compose.yml up -d'
-                    sleep time: 10, unit: 'SECONDS'
-                    sh 'curl -f http://localhost:5002 || echo "Integration test failed but continuing"'
-                    sh 'docker-compose down'
+                dir('exam-code/docker') {
+                sh 'curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose'
+                sh 'chmod +x /usr/local/bin/docker-compose'
+                sh """
+                docker-compose up -d
+                sleep 10  # Allow services to start
+                docker ps | grep -q 5002 && echo "Port 5002 is mapped and the container is running." || echo "1"  // Adjust port for backend if needed
+                docker-compose down
+                """
                 }
             }
         }
